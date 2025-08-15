@@ -59,7 +59,7 @@ def resource_path(relative_path):
 
 # --- メインアプリケーションクラス ---
 class App(tk.Tk):
-    def __init__(self):
+    def __init__(self): 
         load_fonts()
         super().__init__()
         self.title(APP_NAME)
