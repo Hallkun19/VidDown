@@ -105,19 +105,19 @@ class App(tk.Tk):
         # --- 定期的なキューのチェック ---
         self.after(100, self.process_comm_queue)
 
-    def _is_valid_url(self, url):
-        if not url:
-            return False
-        regex = re.compile(
-            r"^(?:http|ftp)s?://"
-            r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"
-            r"localhost|"
-            r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
-            r"(?::\d+)?"
-            r"(?:/?|[/?]\S+)$",
-            re.IGNORECASE,
-        )
-        return re.match(regex, url) is not None
+    # def _is_valid_url(self, url):
+    #     if not url:
+    #         return False
+    #     regex = re.compile(
+    #         r"^(?:http|ftp)s?://"
+    #         r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"
+    #         r"localhost|"
+    #         r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
+    #         r"(?::\d+)?"
+    #         r"(?:/?|[/?]\S+)$",
+    #         re.IGNORECASE,
+    #     )
+    #     return re.match(regex, url) is not None
 
     def _load_icons(self):
         base_icon_theme = "white" if self.current_theme == "dark" else "black"
@@ -350,12 +350,12 @@ class App(tk.Tk):
 
     def add_to_queue(self):
         url = self.url_entry.get().strip()
-        if not self._is_valid_url(url):
-            messagebox.showwarning(
-                "無効なURL",
-                "有効なURL形式ではありません。\nURLを正しく入力または貼り付けしてください。",
-            )
-            return
+        # if not self._is_valid_url(url):
+        #     messagebox.showwarning(
+        #         "無効なURL",
+        #         "有効なURL形式ではありません。\nURLを正しく入力または貼り付けしてください。",
+        #     )
+        #     return
         self.update_status(f"情報を取得中: {url}")
         self.add_queue_button.config(state="disabled")
         thread = threading.Thread(target=self._get_video_info_thread, args=(url,))
