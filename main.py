@@ -366,9 +366,9 @@ class App(tk.Tk):
         try:
             ydl_opts = {
                 "quiet": True,
-                "extract_flat": True,
-                "noplaylist": True,
                 "ignoreerrors": True,
+                "noplaylist": True,
+                "extract_flat": True,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -376,21 +376,18 @@ class App(tk.Tk):
                 raise yt_dlp.utils.DownloadError(
                     "動画情報の解析に失敗しました。返された情報がありません。"
                 )
-            if "entries" in info:
-                for entry in info.get("entries") or []:
-                    if entry:
-                        item = {
-                            "url": entry["url"],
-                            "title": entry.get("title", "タイトル不明"),
-                            "status": "待機中",
-                        }
-                        self.comm_queue.put(("add_item", item))
-            else:
-                item = {
-                    "url": url,
-                    "title": info.get("title", "タイトル不明"),
-                    "status": "待機中",
-                }
+            def get_item(info):
+                if "entries" in info:
+                    for entry in info.get("entries") or []:
+                        if entry:
+                            yield from get_item(entry)
+                else:
+                    yield {
+                        "url": info.get("original_url", info["url"]),
+                        "title": info.get("title", "タイトル不明"),
+                        "status": "待機中",
+                    }
+            for item in get_item(info):
                 self.comm_queue.put(("add_item", item))
             self.comm_queue.put(("info_fetch_success", None))
         except Exception as e:
