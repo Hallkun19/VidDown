@@ -7,6 +7,7 @@ import os
 import sys
 import re
 from pathlib import Path
+import multiprocessing
 
 # 外部ライブラリのインポート
 try:
@@ -653,5 +654,6 @@ class SettingsWindow(tk.Toplevel):
 
 
 if __name__ == "__main__":
+    multiprocessing.freeze_support()
     app = App()
     app.mainloop()
