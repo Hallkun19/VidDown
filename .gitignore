@@ -45,8 +45,3 @@ dist/
 *.lock
 *.spec
 *.iss
-
-ffmpeg/
-fonts/
-icons/
-installer/
