@@ -8,6 +8,8 @@ import sys
 import re
 from pathlib import Path
 import multiprocessing
+import webbrowser
+import urllib.request
 
 # 外部ライブラリのインポート
 try:
@@ -25,7 +27,7 @@ except ImportError:
 
 # --- アプリケーションの基本情報 ---
 APP_NAME = "VidDown"
-APP_VERSION = "1.0.0" 
+APP_VERSION = "1.1.0" 
 APP_AUTHOR = "Made by Halkun19"
 ICON_SIZE = (18, 18)
 
@@ -105,6 +107,49 @@ class App(tk.Tk):
 
         # --- 定期的なキューのチェック ---
         self.after(100, self.process_comm_queue)
+        self.check_for_updates()
+
+    def check_for_updates(self):
+        thread = threading.Thread(target=self._update_check_thread, daemon=True)
+        thread.start()
+
+    def _update_check_thread(self):
+        """バックグラウンドでGitHubの最新リリースを確認する"""
+        try:
+            latest_release_url = "https://github.com/Hallkun19/VidDown/releases/latest"
+            # リダイレクトを追跡して最終的なURLを取得
+            with urllib.request.urlopen(latest_release_url) as response:
+                final_url = response.geturl()
+
+            # URLの末尾からバージョン番号を正規表現で抽出 (例: .../v1.2.3)
+            match = re.search(r'v(\d+\.\d+\.\d+)$', final_url)
+            if not match:
+                return # バージョンタグが見つからなければ何もしない
+
+            latest_version_str = match.group(1)
+            current_version_str = APP_VERSION
+
+            # バージョン文字列を数値のタプルに変換して比較 (例: "1.2.3" -> (1, 2, 3))
+            latest_parts = tuple(map(int, latest_version_str.split('.')))
+            current_parts = tuple(map(int, current_version_str.split('.')))
+
+            if latest_parts > current_parts:
+                # 新しいバージョンがあればメインスレッドに通知
+                self.comm_queue.put(('update_available', latest_version_str))
+
+        except Exception as e:
+            print(f"アップデートチェックに失敗: {e}") # 失敗した場合はサイレントに終了
+
+    def _show_update_prompt(self, new_version):
+        """ユーザーにアップデートを通知するメッセージボックスを表示する"""
+        title = "アップデートのお知らせ"
+        message = (
+            f"新しいバージョン (v{new_version}) が利用可能です！\n"
+            f"現在のバージョンは v{APP_VERSION} です。\n\n"
+            "ダウンロードページを開きますか？"
+        )
+        if messagebox.askyesno(title, message):
+            webbrowser.open("https://github.com/Hallkun19/VidDown/releases/latest")
 
     def _is_valid_url(self, url):
         if not url:
@@ -554,6 +599,8 @@ class App(tk.Tk):
                 elif message_type == "error":
                     messagebox.showerror(data["title"], data["message"])
                     self.update_status(f"エラー: {data['title']}", error=True)
+                elif message_type == 'update_available':
+                    self._show_update_prompt(data)
         except queue.Empty:
             pass
         finally:
