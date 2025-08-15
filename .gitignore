@@ -1,0 +1,48 @@
+# Pythonキャッシュ
+__pycache__/
+*.py[cod]
+*.pyo
+
+# 仮想環境
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE/エディタ設定
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OSファイル
+.DS_Store
+Thumbs.db
+
+# ログ・一時ファイル
+*.log
+*.tmp
+
+# テスト出力
+htmlcov/
+.coverage
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+*.pyc
+
+# パッケージング
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# その他
+*.bak
+*.swp
+*.lock
+*.spec
+*.iss
+# 
