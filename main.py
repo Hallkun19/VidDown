@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 import queue
 import json
-import os
+# import os
 import sys
 import re
 from pathlib import Path
@@ -28,16 +28,21 @@ APP_VERSION = "1.0.0"
 APP_AUTHOR = "Made by Halkun19"
 ICON_SIZE = (18, 18)
 
+RESOURCE_PATH = Path(getattr(sys, "_MEIPASS", ""))
+"""実行ファイル内の一時パス、または開発中の相対パス"""
+SETTINGS_PATH = Path.home() / ".config" / APP_NAME / "settings.json"
+SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+
 
 def load_fonts():
-    font_dir = resource_path("fonts")
-    if not os.path.isdir(font_dir):
+    font_dir = RESOURCE_PATH / "fonts"
+    if not font_dir.is_dir():
         print(f"警告: フォントディレクトリが見つかりません: {font_dir}")
         return
     font_files = {"regular": "BIZUDPGothic-Regular.ttf", "bold": "BIZUDPGothic-Bold.ttf"}
     for font_type, filename in font_files.items():
-        font_path = os.path.join(font_dir, filename)
-        if os.path.exists(font_path):
+        font_path = font_dir / filename
+        if font_path.exists():
             try:
                 pyglet.font.add_file(str(font_path))
                 print(f"フォントをロードしました: {filename}")
@@ -46,17 +51,6 @@ def load_fonts():
         else:
             print(f"警告: フォントファイルが見つかりません: {font_path}")
 
-def resource_path(relative_path):
-    """ 実行ファイル内の一時パス、または開発中の相対パスを取得する """
-    try:
-        # PyInstallerが作成する一時フォルダ
-        base_path = sys._MEIPASS
-    except Exception:
-        # 開発中の通常のパス
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
-
 # --- メインアプリケーションクラス ---
 class App(tk.Tk):
     def __init__(self):
@@ -64,7 +58,7 @@ class App(tk.Tk):
         super().__init__()
         self.title(APP_NAME)
 
-        self.iconbitmap(resource_path(os.path.join("icons", "icon.ico")))
+        self.iconbitmap(RESOURCE_PATH / "icons" / "icon.ico")
 
         self.geometry("1000x600")
         self.minsize(800, 500)
@@ -136,8 +130,8 @@ class App(tk.Tk):
             if name in accent_buttons:
                 current_icon_theme = "black" if base_icon_theme == "white" else "white"
             try:
-                path = resource_path(os.path.join("icons", current_icon_theme, f"{name}.png"))
-                if not os.path.exists(path):
+                path = RESOURCE_PATH / "icons" / current_icon_theme / f"{name}.png"
+                if not path.exists():
                     print(f"警告: アイコンファイルが見つかりません: {path}")
                     self.icons[name] = None
                     continue
@@ -234,7 +228,7 @@ class App(tk.Tk):
         path_frame = ttk.Frame(options_frame)
         path_frame.pack(fill=tk.X, pady=5)
         ttk.Label(path_frame, text="保存先:").pack(side=tk.LEFT)
-        self.path_var = tk.StringVar(value=str(Path.home() / "Downloads"))
+        self.path_var = tk.StringVar(value=Path.home() / "Downloads")
         path_entry = ttk.Entry(path_frame, textvariable=self.path_var)
         path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.browse_button = ttk.Button(
@@ -464,11 +458,12 @@ class App(tk.Tk):
                     "message": f"「{item['title']}」のダウンロード中にエラーが発生しました。\n\n詳細: {clean_message}",
                 }
                 self.comm_queue.put(("error", error_details))
+                raise e
         self.comm_queue.put(("download_finished", None))
 
     def _process_single_download(self, item):
-        save_path = self.path_var.get()
-        os.makedirs(save_path, exist_ok=True)
+        save_path = Path(self.path_var.get())
+        save_path.mkdir(parents=True, exist_ok=True)
         quality_map = {
             "最高画質": None,
             "4320p (8K)": "res:4320",
@@ -485,17 +480,17 @@ class App(tk.Tk):
         if not filename_template.strip():
             filename_template = "%(title)s [%(id)s]"
 
-        output_template = os.path.join(save_path, f"{filename_template}.%(ext)s")
+        output_template = save_path / f"{filename_template}.%(ext)s"
         format_type = self.format_var.get().partition(" ")[0]
         ext = None if format_type.startswith("最良") else format_type.partition("-")[0]
 
         ydl_opts = {
-            "outtmpl": output_template,
+            "outtmpl": str(output_template),
             "ignoreerrors": True,
             "noplaylist": True,
             "progress_hooks": [self.progress_hook],
             "final_ext": ext,
-            "ffmpeg_location": resource_path(os.path.join("ffmpeg", "ffmpeg.exe")),
+            "ffmpeg_location": str(RESOURCE_PATH / "ffmpeg" / "ffmpeg.exe"),
         }
 
         audio_format_map = {
@@ -581,30 +576,22 @@ class App(tk.Tk):
         if error:
             print(f"ERROR: {message}")
 
-    def get_settings_path(self):
-        home = Path.home()
-        config_dir = home / ".config" / APP_NAME
-        config_dir.mkdir(parents=True, exist_ok=True)
-        return config_dir / "settings.json"
-
     def save_setting(self, key, value):
-        settings_path = self.get_settings_path()
         settings = {}
-        if settings_path.exists():
-            with open(settings_path, "r") as f:
+        if SETTINGS_PATH.exists():
+            with open(SETTINGS_PATH, "r") as f:
                 try:
                     settings = json.load(f)
                 except json.JSONDecodeError:
                     pass
         settings[key] = value
-        with open(settings_path, "w") as f:
+        with open(SETTINGS_PATH, "w") as f:
             json.dump(settings, f, indent=4)
 
     def load_setting(self, key, default=None):
-        settings_path = self.get_settings_path()
-        if not settings_path.exists():
+        if not SETTINGS_PATH.exists():
             return default
-        with open(settings_path, "r") as f:
+        with open(SETTINGS_PATH, "r") as f:
             try:
                 settings = json.load(f)
                 return settings.get(key, default)
