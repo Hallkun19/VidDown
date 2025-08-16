@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 import queue
 import json
-# import os
+from os import cpu_count
 import sys
 import re
 from pathlib import Path
@@ -366,6 +366,10 @@ class App(tk.Tk):
                 "ignoreerrors": True,
                 "noplaylist": True,
                 "extract_flat": True,
+                # "sleep_interval_requests": .75,
+                # "sleep_interval": 10,
+                # "max_sleep_interval": 20,
+                # "sleep_interval_subtitles": 5,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -458,7 +462,7 @@ class App(tk.Tk):
                     "message": f"「{item['title']}」のダウンロード中にエラーが発生しました。\n\n詳細: {clean_message}",
                 }
                 self.comm_queue.put(("error", error_details))
-                raise e
+                # raise e
         self.comm_queue.put(("download_finished", None))
 
     def _process_single_download(self, item):
@@ -490,7 +494,13 @@ class App(tk.Tk):
             "noplaylist": True,
             "progress_hooks": [self.progress_hook],
             "final_ext": ext,
+            # "sleep_interval_requests": .75,
+            # "sleep_interval": 10,
+            # "max_sleep_interval": 20,
+            # "sleep_interval_subtitles": 5,
+            "concurrent_fragment_downloads": cpu_count() or 1,
             "ffmpeg_location": str(RESOURCE_PATH / "ffmpeg" / "ffmpeg.exe"),
+            "extractor_args": {"youtube": {"formats": ["dashy"]}},
         }
 
         audio_format_map = {
