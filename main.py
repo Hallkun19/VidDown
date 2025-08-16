@@ -59,7 +59,7 @@ def resource_path(relative_path):
 
 # --- メインアプリケーションクラス ---
 class App(tk.Tk):
-    def __init__(self): 
+    def __init__(self):
         load_fonts()
         super().__init__()
         self.title(APP_NAME)
@@ -386,7 +386,7 @@ class App(tk.Tk):
                             yield from get_item(entry)
                 else:
                     yield {
-                        "url": info.get("original_url", info["url"]),
+                        "info": info,
                         "title": info.get("title", "タイトル不明"),
                         "status": "待機中",
                     }
@@ -454,8 +454,8 @@ class App(tk.Tk):
             )
             self.comm_queue.put(("update_item_status", (item_id, "ダウンロード中")))
             try:
-                self._process_single_download(item)
-                self.comm_queue.put(("update_item_status", (item_id, "完了")))
+                ret = self._process_single_download(item)  # TODO: YDLのwith文をfor文の外に出す最適化
+                self.comm_queue.put(("update_item_status", (item_id, "不完全" if ret else "完了")))  # str(ret or "完了")
             except Exception as e:
                 self.comm_queue.put(("update_item_status", (item_id, "エラー")))
                 clean_message = re.sub(r"\x1b\[[0-9;]*m", "", str(e))
@@ -527,7 +527,8 @@ class App(tk.Tk):
                 ydl_opts["merge_output_format"] = ext
             ydl_opts["format_sort"] = sort_list
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([item["url"]])
+            ydl.process_ie_result(item["info"])
+            return ydl._download_retcode
 
     def progress_hook(self, d):
         if d["status"] == "downloading":
