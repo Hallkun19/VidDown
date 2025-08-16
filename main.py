@@ -266,7 +266,10 @@ class App(tk.Tk):
             options_frame,
             textvariable=self.format_var,
             state="readonly",
-            values=["mp4", "webm", "mkv", "mp3", "m4a", "wav", "flac"],
+            values=[
+                "最良動画", "mp4", "mp4-h.264+aac", "webm", "mkv",
+                "最良音声", "mp3 (再エンコ)", "m4a", "wav (16bit)", "flac",  # "opus"
+            ],
         )
         self.format_combo.pack(fill=tk.X)
         ttk.Label(options_frame, text="画質:").pack(fill=tk.X, pady=(10, 2))
@@ -284,7 +287,7 @@ class App(tk.Tk):
                 "720p",
                 "480p",
                 "360p",
-                "最低画質",
+                "ファイルサイズ最小",
             ],
         )
         self.quality_combo.pack(fill=tk.X)
@@ -467,15 +470,15 @@ class App(tk.Tk):
         save_path = self.path_var.get()
         os.makedirs(save_path, exist_ok=True)
         quality_map = {
-            "最高画質": "bestvideo+bestaudio/best",
-            "4320p (8K)": "bestvideo[height<=4320]+bestaudio/best[height<=4320]",
-            "2160p (4K)": "bestvideo[height<=2160]+bestaudio/best[height<=2160]",
-            "1440p (2K)": "bestvideo[height<=1440]+bestaudio/best[height<=1440]",
-            "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-            "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]",
-            "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]",
-            "360p": "bestvideo[height<=360]+bestaudio/best[height<=360]",
-            "最低画質": "worstvideo+worstaudio/worst",
+            "最高画質": None,
+            "4320p (8K)": "res:4320",
+            "2160p (4K)": "res:2160",
+            "1440p (2K)": "res:1440",
+            "1080p": "res:1080",
+            "720p": "res:720",
+            "480p": "res:480",
+            "360p": "res:360",
+            "ファイルサイズ最小": "+size",
         }
 
         filename_template = self.filename_template_var.get()
@@ -483,29 +486,46 @@ class App(tk.Tk):
             filename_template = "%(title)s [%(id)s]"
 
         output_template = os.path.join(save_path, f"{filename_template}.%(ext)s")
+        format_type = self.format_var.get().partition(" ")[0]
+        ext = None if format_type.startswith("最良") else format_type.partition("-")[0]
 
         ydl_opts = {
             "outtmpl": output_template,
-            "progress_hooks": [self.progress_hook],
-            "noplaylist": True,
             "ignoreerrors": True,
-            'ffmpeg_location': resource_path(os.path.join('ffmpeg', 'ffmpeg.exe'))
+            "noplaylist": True,
+            "progress_hooks": [self.progress_hook],
+            "final_ext": ext,
+            "ffmpeg_location": resource_path(os.path.join("ffmpeg", "ffmpeg.exe")),
         }
 
-        format_type = self.format_var.get()
-        is_audio_only = format_type in ["mp3", "m4a", "wav", "flac"]
-        if is_audio_only:
-            ydl_opts["format"] = "bestaudio/best"
-            ydl_opts["postprocessors"] = [
-                {"key": "FFmpegExtractAudio", "preferredcodec": format_type}
-            ]
+        audio_format_map = {
+            "最良音声": "ba/b",
+            "mp3": "ba[acodec^=mp3]/ba/b",
+            "m4a": "ba[acodec^=aac]/ba[acodec^=mp4a.40.]/ba/b",
+            "opus": "ba/b",
+            "wav": "ba/b",
+            "flac": "ba/b",
+        }
+        if fmt := audio_format_map.get(format_type):
+            ydl_opts["format"] = fmt
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": ext or "best",
+                "preferredquality": "0",
+                "nopostoverwrites": False,
+            }]
         else:
-            ydl_opts["format"] = quality_map.get(
-                self.quality_var.get(), "bestvideo+bestaudio/best"
-            )
-            ydl_opts["postprocessors"] = [
-                {"key": "FFmpegVideoConvertor", "preferedformat": format_type}
-            ]
+            sort_list = [q] if (q := quality_map.get(self.quality_var.get())) else []
+            if ext:  # format_type != "最良動画"
+                if format_type == "mp4-h.264+aac":
+                    sort_list += [
+                        "vcodec:h264", "lang", "quality", "res", "fps", "hdr:12", "acodec:aac"
+                    ]
+                ydl_opts["postprocessors"] = [
+                    {"key": "FFmpegVideoRemuxer", "preferedformat": ext}
+                ]
+                ydl_opts["merge_output_format"] = ext
+            ydl_opts["format_sort"] = sort_list
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([item["url"]])
 
