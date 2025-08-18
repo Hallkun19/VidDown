@@ -3,7 +3,7 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 import queue
 import json
-import os
+from os import cpu_count
 import sys
 import re
 from pathlib import Path
@@ -31,16 +31,21 @@ APP_VERSION = "1.1.0"
 APP_AUTHOR = "Made by Halkun19"
 ICON_SIZE = (18, 18)
 
+RESOURCE_PATH = Path(getattr(sys, "_MEIPASS", ""))
+"""実行ファイル内の一時パス、または開発中の相対パス"""
+SETTINGS_PATH = Path.home() / ".config" / APP_NAME / "settings.json"
+SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+
 
 def load_fonts():
-    font_dir = resource_path("fonts")
-    if not os.path.isdir(font_dir):
+    font_dir = RESOURCE_PATH / "fonts"
+    if not font_dir.is_dir():
         print(f"警告: フォントディレクトリが見つかりません: {font_dir}")
         return
     font_files = {"regular": "BIZUDPGothic-Regular.ttf", "bold": "BIZUDPGothic-Bold.ttf"}
     for font_type, filename in font_files.items():
-        font_path = os.path.join(font_dir, filename)
-        if os.path.exists(font_path):
+        font_path = font_dir / filename
+        if font_path.exists():
             try:
                 pyglet.font.add_file(str(font_path))
                 print(f"フォントをロードしました: {filename}")
@@ -49,25 +54,14 @@ def load_fonts():
         else:
             print(f"警告: フォントファイルが見つかりません: {font_path}")
 
-def resource_path(relative_path):
-    """ 実行ファイル内の一時パス、または開発中の相対パスを取得する """
-    try:
-        # PyInstallerが作成する一時フォルダ
-        base_path = sys._MEIPASS
-    except Exception:
-        # 開発中の通常のパス
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
-
 # --- メインアプリケーションクラス ---
 class App(tk.Tk):
-    def __init__(self): 
+    def __init__(self):
         load_fonts()
         super().__init__()
         self.title(APP_NAME)
 
-        self.iconbitmap(resource_path(os.path.join("icons", "icon.ico")))
+        self.iconbitmap(RESOURCE_PATH / "icons" / "icon.ico")
 
         self.geometry("1000x600")
         self.minsize(800, 500)
@@ -151,19 +145,19 @@ class App(tk.Tk):
         if messagebox.askyesno(title, message):
             webbrowser.open("https://github.com/Hallkun19/VidDown/releases/latest")
 
-    def _is_valid_url(self, url):
-        if not url:
-            return False
-        regex = re.compile(
-            r"^(?:http|ftp)s?://"
-            r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"
-            r"localhost|"
-            r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
-            r"(?::\d+)?"
-            r"(?:/?|[/?]\S+)$",
-            re.IGNORECASE,
-        )
-        return re.match(regex, url) is not None
+    # def _is_valid_url(self, url):
+    #     if not url:
+    #         return False
+    #     regex = re.compile(
+    #         r"^(?:http|ftp)s?://"
+    #         r"(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|"
+    #         r"localhost|"
+    #         r"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})"
+    #         r"(?::\d+)?"
+    #         r"(?:/?|[/?]\S+)$",
+    #         re.IGNORECASE,
+    #     )
+    #     return re.match(regex, url) is not None
 
     def _load_icons(self):
         base_icon_theme = "white" if self.current_theme == "dark" else "black"
@@ -182,8 +176,8 @@ class App(tk.Tk):
             if name in accent_buttons:
                 current_icon_theme = "black" if base_icon_theme == "white" else "white"
             try:
-                path = resource_path(os.path.join("icons", current_icon_theme, f"{name}.png"))
-                if not os.path.exists(path):
+                path = RESOURCE_PATH / "icons" / current_icon_theme / f"{name}.png"
+                if not path.exists():
                     print(f"警告: アイコンファイルが見つかりません: {path}")
                     self.icons[name] = None
                     continue
@@ -280,7 +274,7 @@ class App(tk.Tk):
         path_frame = ttk.Frame(options_frame)
         path_frame.pack(fill=tk.X, pady=5)
         ttk.Label(path_frame, text="保存先:").pack(side=tk.LEFT)
-        self.path_var = tk.StringVar(value=str(Path.home() / "Downloads"))
+        self.path_var = tk.StringVar(value=Path.home() / "Downloads")
         path_entry = ttk.Entry(path_frame, textvariable=self.path_var)
         path_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
         self.browse_button = ttk.Button(
@@ -312,7 +306,10 @@ class App(tk.Tk):
             options_frame,
             textvariable=self.format_var,
             state="readonly",
-            values=["mp4", "webm", "mkv", "mp3", "m4a", "wav", "flac"],
+            values=[
+                "最良動画", "mp4", "mp4-h.264+aac", "webm", "mkv",
+                "最良音声", "mp3 (再エンコ)", "m4a", "wav (16bit)", "flac",  # "opus"
+            ],
         )
         self.format_combo.pack(fill=tk.X)
         ttk.Label(options_frame, text="画質:").pack(fill=tk.X, pady=(10, 2))
@@ -330,7 +327,7 @@ class App(tk.Tk):
                 "720p",
                 "480p",
                 "360p",
-                "最低画質",
+                "ファイルサイズ最小",
             ],
         )
         self.quality_combo.pack(fill=tk.X)
@@ -396,12 +393,12 @@ class App(tk.Tk):
 
     def add_to_queue(self):
         url = self.url_entry.get().strip()
-        if not self._is_valid_url(url):
-            messagebox.showwarning(
-                "無効なURL",
-                "有効なURL形式ではありません。\nURLを正しく入力または貼り付けしてください。",
-            )
-            return
+        # if not self._is_valid_url(url):
+        #     messagebox.showwarning(
+        #         "無効なURL",
+        #         "有効なURL形式ではありません。\nURLを正しく入力または貼り付けしてください。",
+        #     )
+        #     return
         self.update_status(f"情報を取得中: {url}")
         self.add_queue_button.config(state="disabled")
         thread = threading.Thread(target=self._get_video_info_thread, args=(url,))
@@ -412,9 +409,13 @@ class App(tk.Tk):
         try:
             ydl_opts = {
                 "quiet": True,
-                "extract_flat": True,
-                "noplaylist": True,
                 "ignoreerrors": True,
+                "noplaylist": True,
+                "extract_flat": True,
+                # "sleep_interval_requests": .75,
+                # "sleep_interval": 10,
+                # "max_sleep_interval": 20,
+                # "sleep_interval_subtitles": 5,
             }
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                 info = ydl.extract_info(url, download=False)
@@ -422,21 +423,18 @@ class App(tk.Tk):
                 raise yt_dlp.utils.DownloadError(
                     "動画情報の解析に失敗しました。返された情報がありません。"
                 )
-            if "entries" in info:
-                for entry in info.get("entries") or []:
-                    if entry:
-                        item = {
-                            "url": entry["url"],
-                            "title": entry.get("title", "タイトル不明"),
-                            "status": "待機中",
-                        }
-                        self.comm_queue.put(("add_item", item))
-            else:
-                item = {
-                    "url": url,
-                    "title": info.get("title", "タイトル不明"),
-                    "status": "待機中",
-                }
+            def get_item(info):
+                if "entries" in info:
+                    for entry in info.get("entries") or []:
+                        if entry:
+                            yield from get_item(entry)
+                else:
+                    yield {
+                        "info": info,
+                        "title": info.get("title", "タイトル不明"),
+                        "status": "待機中",
+                    }
+            for item in get_item(info):
                 self.comm_queue.put(("add_item", item))
             self.comm_queue.put(("info_fetch_success", None))
         except Exception as e:
@@ -500,8 +498,8 @@ class App(tk.Tk):
             )
             self.comm_queue.put(("update_item_status", (item_id, "ダウンロード中")))
             try:
-                self._process_single_download(item)
-                self.comm_queue.put(("update_item_status", (item_id, "完了")))
+                ret = self._process_single_download(item)  # TODO: YDLのwith文をfor文の外に出す最適化
+                self.comm_queue.put(("update_item_status", (item_id, "不完全" if ret else "完了")))  # str(ret or "完了")
             except Exception as e:
                 self.comm_queue.put(("update_item_status", (item_id, "エラー")))
                 clean_message = re.sub(r"\x1b\[[0-9;]*m", "", str(e))
@@ -510,53 +508,78 @@ class App(tk.Tk):
                     "message": f"「{item['title']}」のダウンロード中にエラーが発生しました。\n\n詳細: {clean_message}",
                 }
                 self.comm_queue.put(("error", error_details))
+                # raise e
         self.comm_queue.put(("download_finished", None))
 
     def _process_single_download(self, item):
-        save_path = self.path_var.get()
-        os.makedirs(save_path, exist_ok=True)
+        save_path = Path(self.path_var.get())
+        save_path.mkdir(parents=True, exist_ok=True)
         quality_map = {
-            "最高画質": "bestvideo+bestaudio/best",
-            "4320p (8K)": "bestvideo[height<=4320]+bestaudio/best[height<=4320]",
-            "2160p (4K)": "bestvideo[height<=2160]+bestaudio/best[height<=2160]",
-            "1440p (2K)": "bestvideo[height<=1440]+bestaudio/best[height<=1440]",
-            "1080p": "bestvideo[height<=1080]+bestaudio/best[height<=1080]",
-            "720p": "bestvideo[height<=720]+bestaudio/best[height<=720]",
-            "480p": "bestvideo[height<=480]+bestaudio/best[height<=480]",
-            "360p": "bestvideo[height<=360]+bestaudio/best[height<=360]",
-            "最低画質": "worstvideo+worstaudio/worst",
+            "最高画質": None,
+            "4320p (8K)": "res:4320",
+            "2160p (4K)": "res:2160",
+            "1440p (2K)": "res:1440",
+            "1080p": "res:1080",
+            "720p": "res:720",
+            "480p": "res:480",
+            "360p": "res:360",
+            "ファイルサイズ最小": "+size",
         }
 
         filename_template = self.filename_template_var.get()
         if not filename_template.strip():
             filename_template = "%(title)s [%(id)s]"
 
-        output_template = os.path.join(save_path, f"{filename_template}.%(ext)s")
+        output_template = save_path / f"{filename_template}.%(ext)s"
+        format_type = self.format_var.get().partition(" ")[0]
+        ext = None if format_type.startswith("最良") else format_type.partition("-")[0]
 
         ydl_opts = {
-            "outtmpl": output_template,
-            "progress_hooks": [self.progress_hook],
-            "noplaylist": True,
+            "outtmpl": str(output_template),
             "ignoreerrors": True,
-            'ffmpeg_location': resource_path(os.path.join('ffmpeg', 'ffmpeg.exe'))
+            "noplaylist": True,
+            "progress_hooks": [self.progress_hook],
+            "final_ext": ext,
+            # "sleep_interval_requests": .75,
+            # "sleep_interval": 10,
+            # "max_sleep_interval": 20,
+            # "sleep_interval_subtitles": 5,
+            "concurrent_fragment_downloads": cpu_count() or 1,
+            "ffmpeg_location": str(RESOURCE_PATH / "ffmpeg" / "ffmpeg.exe"),
+            "extractor_args": {"youtube": {"formats": ["dashy"]}},
         }
 
-        format_type = self.format_var.get()
-        is_audio_only = format_type in ["mp3", "m4a", "wav", "flac"]
-        if is_audio_only:
-            ydl_opts["format"] = "bestaudio/best"
-            ydl_opts["postprocessors"] = [
-                {"key": "FFmpegExtractAudio", "preferredcodec": format_type}
-            ]
+        audio_format_map = {
+            "最良音声": "ba/b",
+            "mp3": "ba[acodec^=mp3]/ba/b",
+            "m4a": "ba[acodec^=aac]/ba[acodec^=mp4a.40.]/ba/b",
+            "opus": "ba/b",
+            "wav": "ba/b",
+            "flac": "ba/b",
+        }
+        if fmt := audio_format_map.get(format_type):
+            ydl_opts["format"] = fmt
+            ydl_opts["postprocessors"] = [{
+                "key": "FFmpegExtractAudio",
+                "preferredcodec": ext or "best",
+                "preferredquality": "0",
+                "nopostoverwrites": False,
+            }]
         else:
-            ydl_opts["format"] = quality_map.get(
-                self.quality_var.get(), "bestvideo+bestaudio/best"
-            )
-            ydl_opts["postprocessors"] = [
-                {"key": "FFmpegVideoConvertor", "preferedformat": format_type}
-            ]
+            sort_list = [q] if (q := quality_map.get(self.quality_var.get())) else []
+            if ext:  # format_type != "最良動画"
+                if format_type == "mp4-h.264+aac":
+                    sort_list += [
+                        "vcodec:h264", "lang", "quality", "res", "fps", "hdr:12", "acodec:aac"
+                    ]
+                ydl_opts["postprocessors"] = [
+                    {"key": "FFmpegVideoRemuxer", "preferedformat": ext}
+                ]
+                ydl_opts["merge_output_format"] = ext
+            ydl_opts["format_sort"] = sort_list
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([item["url"]])
+            ydl.process_ie_result(item["info"])
+            return ydl._download_retcode
 
     def progress_hook(self, d):
         if d["status"] == "downloading":
@@ -611,30 +634,22 @@ class App(tk.Tk):
         if error:
             print(f"ERROR: {message}")
 
-    def get_settings_path(self):
-        home = Path.home()
-        config_dir = home / ".config" / APP_NAME
-        config_dir.mkdir(parents=True, exist_ok=True)
-        return config_dir / "settings.json"
-
     def save_setting(self, key, value):
-        settings_path = self.get_settings_path()
         settings = {}
-        if settings_path.exists():
-            with open(settings_path, "r") as f:
+        if SETTINGS_PATH.exists():
+            with open(SETTINGS_PATH, "r") as f:
                 try:
                     settings = json.load(f)
                 except json.JSONDecodeError:
                     pass
         settings[key] = value
-        with open(settings_path, "w") as f:
+        with open(SETTINGS_PATH, "w") as f:
             json.dump(settings, f, indent=4)
 
     def load_setting(self, key, default=None):
-        settings_path = self.get_settings_path()
-        if not settings_path.exists():
+        if not SETTINGS_PATH.exists():
             return default
-        with open(settings_path, "r") as f:
+        with open(SETTINGS_PATH, "r") as f:
             try:
                 settings = json.load(f)
                 return settings.get(key, default)
