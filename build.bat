@@ -1,0 +1,1 @@
+pyinstaller --noconsole --name VidDown --icon="icons/icon.ico" --add-data "fonts;fonts" --add-data "icons;icons" --add-data "ffmpeg;ffmpeg" --hidden-import "yt_dlp.extractor" main.py

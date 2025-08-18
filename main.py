@@ -327,7 +327,7 @@ class App(tk.Tk):
                 "720p",
                 "480p",
                 "360p",
-                "ファイルサイズ最小",
+                "最小ファイルサイズ",
             ],
         )
         self.quality_combo.pack(fill=tk.X)
