@@ -27,7 +27,7 @@ except ImportError:
 
 # --- アプリケーションの基本情報 ---
 APP_NAME = "VidDown"
-APP_VERSION = "1.1.0" 
+APP_VERSION = "1.1.1" 
 APP_AUTHOR = "Made by Halkun19"
 ICON_SIZE = (18, 18)
 
