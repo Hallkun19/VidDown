@@ -307,8 +307,8 @@ class App(tk.Tk):
             textvariable=self.format_var,
             state="readonly",
             values=[
-                "最良動画", "mp4", "mp4-h.264+aac", "webm", "mkv",
-                "最良音声", "mp3 (再エンコ)", "m4a", "wav (16bit)", "flac",  # "opus"
+                "最良動画", "mp4", "mp4+aac", "webm", "mkv",
+                "最良音声", "mp3", "m4a", "wav", "flac",  # "opus"
             ],
         )
         self.format_combo.pack(fill=tk.X)
